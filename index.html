@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>聊天 · 自定义</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue','PingFang SC','Microsoft YaHei',sans-serif; }
+html,body { height:100%; width:100%; overflow:hidden; background:#ededed; -webkit-text-size-adjust:100%; }
+body { display:flex; justify-content:center; align-items:stretch; }
+.phone { width:100%; max-width:500px; height:100vh; height:100dvh; background:#ededed; display:flex; flex-direction:column; overflow:hidden; margin:0 auto; }
+.top-bar { height:50px; background:#ededed; display:flex; align-items:center; justify-content:center; position:relative; flex-shrink:0; border-bottom:0.5px solid #d9d9d9; padding-top:env(safe-area-inset-top); box-sizing:content-box; }
+.top-bar .title { font-size:17px; font-weight:500; color:#000; }
+.top-bar .back { position:absolute; left:14px; font-size:20px; color:#000; cursor:pointer; display:none; }
+.top-bar .back.show { display:block; }
+.content { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+.content::-webkit-scrollbar { display:none; }
+.page { display:none; height:100%; flex-direction:column; }
+.page.active { display:flex; }
+
+/* 聊天 */
+.chat-area { flex:1; overflow-y:auto; padding:12px 12px 8px; background:#ededed; display:flex; flex-direction:column; gap:14px; scrollbar-width:none; }
+.chat-area::-webkit-scrollbar { display:none; }
+.msg-row { display:flex; align-items:flex-start; gap:8px; max-width:78%; }
+.msg-row.them { align-self:flex-start; }
+.msg-row.me { align-self:flex-end; flex-direction:row-reverse; }
+.msg-avatar { width:40px; height:40px; border-radius:6px; overflow:hidden; flex-shrink:0; background:#5b8cff; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:500; font-size:15px; }
+.msg-avatar img { width:100%; height:100%; object-fit:cover; }
+.msg-bubble { padding:9px 13px; border-radius:6px; font-size:15px; line-height:1.45; word-break:break-word; box-shadow:0 1px 2px rgba(0,0,0,0.04); }
+.msg-row.them .msg-bubble { background:#fff; color:#000; border-top-left-radius:2px; }
+.msg-row.me .msg-bubble { background:#95ec69; color:#000; border-top-right-radius:2px; }
+.msg-bubble.sticker-only { padding:0; background:transparent !important; box-shadow:none; }
+.msg-bubble.sticker-only .emoji-big { font-size:44px; line-height:1.2; display:block; }
+.quote-block { background:rgba(0,0,0,0.05); border-left:2px solid #07c160; padding:4px 8px; border-radius:3px; font-size:12px; color:#888; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+.quote-block .qn { color:#07c160; }
+.read-receipt { font-size:11px; color:#999; margin-top:4px; text-align:right; }
+.read-receipt.read { color:#07c160; }
+.timestamp { text-align:center; font-size:11px; color:#999; padding:6px 0; }
+.typing-dots { display:flex; gap:4px; padding:13px 16px; background:#fff; border-radius:6px; border-top-left-radius:2px; width:fit-content; }
+.typing-dots span { width:6px; height:6px; background:#bbb; border-radius:50%; animation:bounce 1.2s infinite; }
+.typing-dots span:nth-child(2){animation-delay:0.2s;} .typing-dots span:nth-child(3){animation-delay:0.4s;}
+@keyframes bounce { 0%,60%,100%{transform:translateY(0);opacity:0.4;} 30%{transform:translateY(-4px);opacity:1;} }
+.chat-input { background:#f7f7f7; border-top:0.5px solid #d9d9d9; padding:8px 12px; display:flex; align-items:center; gap:10px; flex-shrink:0; padding-bottom:calc(8px + env(safe-area-inset-bottom)); }
+.chat-input input { flex:1; height:38px; border:none; border-radius:6px; padding:0 12px; font-size:15px; background:#fff; outline:none; }
+.chat-input .send { height:38px; padding:0 18px; background:#07c160; color:#fff; border:none; border-radius:6px; font-size:15px; font-weight:500; cursor:pointer; }
+.chat-input .send:active { background:#06ad56; }
+
+/* 通用页面容器 */
+.page-body { background:#ededed; padding:12px 0 80px; height:100%; overflow-y:auto; }
+
+/* 自定义页 */
+.custom-tabs { display:flex; background:#fff; border-bottom:0.5px solid #e6e6e6; position:sticky; top:0; z-index:10; }
+.custom-tab { flex:1; text-align:center; padding:14px 0; font-size:15px; color:#666; cursor:pointer; position:relative; }
+.custom-tab.active { color:#07c160; font-weight:600; }
+.custom-tab.active::after { content:''; position:absolute; bottom:0; left:50%; transform:translateX(-50%); width:30px; height:3px; background:#07c160; border-radius:2px; }
+.custom-toolbar { display:flex; gap:6px; padding:10px 12px; background:#fff; border-bottom:0.5px solid #e6e6e6; overflow-x:auto; }
+.custom-toolbar button { flex-shrink:0; padding:7px 14px; font-size:13px; border:1px solid #e6e6e6; border-radius:8px; background:#fff; color:#333; cursor:pointer; }
+.custom-toolbar button.primary { background:#07c160; color:#fff; border-color:#07c160; }
+.custom-toolbar button:active { opacity:0.7; }
+.custom-tags { display:flex; gap:8px; padding:10px 12px; background:#fff; border-bottom:0.5px solid #e6e6e6; overflow-x:auto; }
+.custom-tags .tag { flex-shrink:0; padding:6px 14px; font-size:13px; border-radius:14px; background:#f0f0f0; color:#666; cursor:pointer; white-space:nowrap; }
+.custom-tags .tag.active { background:#e6f7ee; color:#07c160; font-weight:600; }
+.custom-list { padding:12px; }
+.card-item { background:#fff; border-radius:10px; padding:12px 14px; margin-bottom:8px; display:flex; align-items:center; gap:10px; box-shadow:0 1px 2px rgba(0,0,0,0.03); }
+.card-item.pinned { border:1px solid #07c160; }
+.card-item .text { flex:1; font-size:15px; color:#333; word-break:break-word; }
+.card-item .actions { display:flex; gap:2px; flex-shrink:0; }
+.card-item .actions i { padding:6px; color:#999; font-size:14px; cursor:pointer; }
+.card-item .actions i.pin:hover { color:#07c160; }
+.card-item .actions i.tag:hover { color:#07c160; }
+.card-item .actions i.edit:hover { color:#07c160; }
+.card-item .actions i.del:hover { color:#ff3b30; }
+.empty-tip { text-align:center; color:#aaa; font-size:14px; padding:60px 20px; }
+.custom-add-btn { position:fixed; bottom:80px; left:50%; transform:translateX(-50%); padding:10px 28px; background:#07c160; color:#fff; border:none; border-radius:22px; font-size:15px; font-weight:500; cursor:pointer; box-shadow:0 4px 12px rgba(7,193,96,0.3); z-index:20; }
+.custom-add-btn:active { background:#06ad56; }
+
+/* 我页 */
+.me-page { background:#ededed; padding:24px 16px; }
+.me-avatar-big { width:80px; height:80px; border-radius:10px; margin:0 auto 12px; background:#5b8cff; display:flex; align-items:center; justify-content:center; color:#fff; font-size:32px; font-weight:500; overflow:hidden; }
+.me-avatar-big img { width:100%; height:100%; object-fit:cover; }
+.me-name { font-size:20px; font-weight:600; color:#000; margin-bottom:24px; text-align:center; }
+.me-row { background:#fff; border-radius:10px; padding:14px 16px; display:flex; align-items:center; justify-content:space-between; font-size:15px; color:#333; margin-bottom:10px; cursor:pointer; }
+.me-row .left { display:flex; align-items:center; gap:10px; }
+.me-row .left i { color:#07c160; width:20px; text-align:center; }
+.me-row .arrow { color:#ccc; }
+.avatar-picker { display:flex; align-items:center; gap:10px; }
+.avatar-picker .av { width:44px; height:44px; border-radius:8px; overflow:hidden; background:#5b8cff; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:500; font-size:18px; }
+.avatar-picker .av img { width:100%; height:100%; object-fit:cover; }
+
+/* 设置页 */
+.settings-page { background:#ededed; padding:12px 0 80px; }
+.settings-group { background:#fff; border-radius:10px; margin:0 12px 12px; overflow:hidden; }
+.settings-group .group-title { font-size:13px; color:#888; padding:14px 16px 6px; font-weight:500; }
+.settings-item { display:flex; align-items:center; padding:13px 16px; border-bottom:0.5px solid #f0f0f0; font-size:15px; color:#000; }
+.settings-item:last-child { border-bottom:none; }
+.settings-item .label { flex-shrink:0; width:110px; color:#333; }
+.slider-row { display:flex; align-items:center; gap:8px; flex:1; justify-content:flex-end; }
+.slider-row input[type="range"] { flex:1; accent-color:#07c160; }
+.slider-row .val { font-size:13px; color:#07c160; width:56px; text-align:right; }
+.switch { position:relative; display:inline-block; width:44px; height:26px; margin-left:auto; flex-shrink:0; }
+.switch input { opacity:0; width:0; height:0; }
+.switch .slider { position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background:#ccc; border-radius:26px; transition:.2s; }
+.switch .slider:before { position:absolute; content:""; height:22px; width:22px; left:2px; bottom:2px; background:#fff; border-radius:50%; transition:.2s; }
+.switch input:checked + .slider { background:#07c160; }
+.switch input:checked + .slider:before { transform:translateX(18px); }
+.danger-btn { color:#ff3b30; justify-content:center; cursor:pointer; }
+.storage-bar { display:flex; align-items:center; gap:8px; padding:4px 0; }
+.storage-bar .bar { flex:1; height:6px; background:#eee; border-radius:3px; overflow:hidden; }
+.storage-bar .bar .fill { height:100%; background:#07c160; }
+.storage-bar .text { font-size:12px; color:#666; min-width:80px; text-align:right; }
+
+/* 弹窗 */
+.modal-mask { position:fixed; inset:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:100; }
+.modal-box { background:#fff; border-radius:12px; width:85%; max-width:340px; overflow:hidden; }
+.modal-box .modal-title { padding:16px; font-size:16px; font-weight:600; text-align:center; border-bottom:0.5px solid #eee; }
+.modal-box .modal-body { padding:16px; }
+.modal-box .modal-body textarea { width:100%; border:1px solid #e6e6e6; border-radius:8px; padding:10px 12px; font-size:14px; min-height:80px; outline:none; font-family:inherit; resize:vertical; }
+.modal-box .modal-body textarea:focus { border-color:#07c160; }
+.modal-box .modal-btns { display:flex; border-top:0.5px solid #eee; }
+.modal-box .modal-btns button { flex:1; padding:14px; border:none; background:transparent; font-size:15px; cursor:pointer; }
+.modal-box .modal-btns button:first-child { border-right:0.5px solid #eee; color:#666; }
+.modal-box .modal-btns button:last-child { color:#07c160; font-weight:500; }
+.modal-box .modal-btns button:active { background:#f5f5f5; }
+.modal-box .modal-btns.vertical { flex-direction:column; }
+.modal-box .modal-btns.vertical button { border-right:none; border-bottom:0.5px solid #eee; }
+.modal-box .modal-btns.vertical button:last-child { border-bottom:none; }
+
+.tab-bar { height:56px; background:#f7f7f7; border-top:0.5px solid #d9d9d9; display:flex; flex-shrink:0; padding-bottom:env(safe-area-inset-bottom); box-sizing:content-box; }
+.tab-item { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; color:#7a7a7a; font-size:10px; cursor:pointer; }
+.tab-item i { font-size:20px; }
+.tab-item.active { color:#07c160; }
+</style>
+</head>
+<body>
+<div class="phone">
+    <div class="top-bar">
+        <div class="back" id="backBtn"><i class="fas fa-chevron-left"></i></div>
+        <div class="title" id="topTitle">聊天</div>
+    </div>
+    <div class="content" id="content">
+
+        <!-- 聊天 -->
+        <div class="page active" id="page-chat">
+            <div class="chat-area" id="chatArea"></div>
+            <div class="chat-input">
+                <input type="text" id="msgInput" placeholder="输入消息..." autocomplete="off">
+                <button class="send" id="sendBtn">发送</button>
+            </div>
+        </div>
+
+        <!-- 自定义 -->
+        <div class="page" id="page-custom">
+            <div class="page-body">
+                <div class="custom-tabs">
+                    <div class="custom-tab active" data-tab="replies">主字卡</div>
+                    <div class="custom-tab" data-tab="emojis">Emoji</div>
+                </div>
+                <div class="custom-toolbar">
+                    <button id="searchBtn">🔍 搜索</button>
+                    <button id="groupBtn">📁 分组</button>
+                    <button id="importBtn">导入</button>
+                    <button id="exportBtn" class="primary">导出</button>
+                </div>
+                <div class="custom-tags" id="customTags"></div>
+                <div class="custom-list" id="customList"></div>
+                <button class="custom-add-btn" id="addBtn">+ 新增</button>
+            </div>
+        </div>
+
+        <!-- 我 -->
+        <div class="page" id="page-me">
+            <div class="page-body" style="padding:0;">
+                <div class="me-page">
+                    <div class="me-avatar-big" id="meAvatar">我</div>
+                    <div class="me-name" id="meName">我</div>
+
+                    <div class="settings-group">
+                        <div class="group-title">我的信息</div>
+                        <div class="me-row" id="editMyName">
+                            <div class="left"><i class="fas fa-user"></i>我的昵称</div>
+                            <div class="arrow">修改 <i class="fas fa-chevron-right"></i></div>
+                        </div>
+                        <div class="me-row" id="editMyAvatar">
+                            <div class="left"><i class="fas fa-image"></i>我的头像</div>
+                            <div class="arrow">修改 <i class="fas fa-chevron-right"></i></div>
+                        </div>
+                    </div>
+
+                    <div class="settings-group">
+                        <div class="group-title">对方信息</div>
+                        <div class="me-row" id="editPartnerName">
+                            <div class="left"><i class="fas fa-user"></i>对方昵称</div>
+                            <div class="arrow">修改 <i class="fas fa-chevron-right"></i></div>
+                        </div>
+                        <div class="me-row" id="editPartnerAvatar">
+                            <div class="left"><i class="fas fa-image"></i>对方头像</div>
+                            <div class="arrow">修改 <i class="fas fa-chevron-right"></i></div>
+                        </div>
+                    </div>
+
+                    <div class="settings-group">
+                        <div class="me-row" id="toSettings">
+                            <div class="left"><i class="fas fa-cog"></i>设置</div>
+                            <div class="arrow"><i class="fas fa-chevron-right"></i></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 设置 -->
+        <div class="page" id="page-settings">
+            <div class="settings-page">
+                <div class="settings-group">
+                    <div class="group-title">回复等待时间</div>
+                    <div class="settings-item">
+                        <span class="label">最短等待</span>
+                        <div class="slider-row"><input type="range" id="delayMin" min="1" max="30" value="1"><span class="val" id="delayMinVal">1s</span></div>
+                    </div>
+                    <div class="settings-item">
+                        <span class="label">最长等待</span>
+                        <div class="slider-row"><input type="range" id="delayMax" min="30" max="120" value="60"><span class="val" id="delayMaxVal">60s</span></div>
+                    </div>
+                </div>
+                <div class="settings-group">
+                    <div class="group-title">回复概率</div>
+                    <div class="settings-item"><span class="label">发1条</span><div class="slider-row"><input type="range" id="p1" min="0" max="100" value="75"><span class="val" id="p1v">75%</span></div></div>
+                    <div class="settings-item"><span class="label">发2条</span><div class="slider-row"><input type="range" id="p2" min="0" max="100" value="20"><span class="val" id="p2v">20%</span></div></div>
+                    <div class="settings-item"><span class="label">发3条</span><div class="slider-row"><input type="range" id="p3" min="0" max="100" value="5"><span class="val" id="p3v">5%</span></div></div>
+                    <div class="settings-item"><span class="label">字卡带Emoji</span><div class="slider-row"><input type="range" id="pEmoji" min="0" max="100" value="20"><span class="val" id="pEmojiv">20%</span></div></div>
+                    <div class="settings-item"><span class="label">直接发Emoji</span><div class="slider-row"><input type="range" id="pPureEmoji" min="0" max="100" value="10"><span class="val" id="pPureEmojiv">10%</span></div></div>
+                </div>
+                <div class="settings-group">
+                    <div class="group-title">消息交互</div>
+                    <div class="settings-item"><span class="label">引用回复</span><label class="switch"><input type="checkbox" id="useQuote" checked><span class="slider"></span></label></div>
+                    <div class="settings-item"><span class="label">正在输入</span><label class="switch"><input type="checkbox" id="useTyping" checked><span class="slider"></span></label></div>
+                    <div class="settings-item"><span class="label">已读回执</span><label class="switch"><input type="checkbox" id="useReadReceipt" checked><span class="slider"></span></label></div>
+                </div>
+                <div class="settings-group">
+                    <div class="group-title">聊天记录</div>
+                    <div class="settings-item" id="exportChat" style="cursor:pointer;">导出聊天记录</div>
+                    <div class="settings-item" id="importChat" style="cursor:pointer;">导入聊天记录</div>
+                </div>
+                <div class="settings-group">
+                    <div class="group-title">全部数据备份</div>
+                    <div class="settings-item" id="exportAll" style="cursor:pointer;">导出全部数据</div>
+                    <div class="settings-item" id="importAll" style="cursor:pointer;">恢复全部数据</div>
+                </div>
+                <div class="settings-group">
+                    <div class="group-title">存储空间</div>
+                    <div class="settings-item" style="flex-direction:column; align-items:stretch; gap:6px;">
+                        <div class="storage-bar">
+                            <div class="bar"><div class="fill" id="storageFill" style="width:0%"></div></div>
+                            <span class="text" id="storageText">0 B / 500 MB</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="settings-group">
+                    <div class="settings-item danger-btn" id="clearChat">删除对话消息</div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="tab-bar">
+        <div class="tab-item active" data-page="chat"><i class="fas fa-comment"></i><span>聊天</span></div>
+        <div class="tab-item" data-page="custom"><i class="fas fa-address-book"></i><span>自定义</span></div>
+        <div class="tab-item" data-page="me"><i class="fas fa-user"></i><span>我</span></div>
+    </div>
+</div>
+
+<script>
+/* ========== IndexedDB ========== */
+const DB_NAME = 'chat_app_v1';
+const STORE = 'data';
+let db = null;
+
+function openDB() {
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, 1);
+        req.onupgradeneeded = e => {
+            const d = e.target.result;
+            if (!d.objectStoreNames.contains(STORE)) d.createObjectStore(STORE);
+        };
+        req.onsuccess = e => { db = e.target.result; resolve(); };
+        req.onerror = e => reject(e.target.error);
+    });
+}
+function dbGet(key) {
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, 'readonly');
+        const req = tx.objectStore(STORE).get(key);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    });
+}
+function dbPut(value, key) {
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, 'readwrite');
+        const req = tx.objectStore(STORE).put(value, key);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+    });
+}
+
+/* ========== 默认配置 ========== */
+const DEFAULT = {
+    myName: '我',
+    myAvatar: '',
+    partnerName: '对方',
+    partnerAvatar: '',
+    delayMin: 1,      // 秒
+    delayMax: 60,     // 秒
+    p1: 75, p2: 20, p3: 5,
+    pEmoji: 20,       // 字卡带emoji
+    pPureEmoji: 10,   // 直接发emoji
+    useQuote: true, useTyping: true, useReadReceipt: true,
+    customReplies: [],
+    customEmojis: [],
+    customPokes: [],
+    chatHistory: []
+};
+let CFG = JSON.parse(JSON.stringify(DEFAULT));
+let currentTab = 'replies';
+let replyTimer = null;
+let lastMsgEl = null;
+
+/* ========== 启动 ========== */
+async function init() {
+    try { await openDB(); } catch(e) { alert('数据库打开失败：' + e.message); return; }
+    const saved = await dbGet('main');
+    if (saved) CFG = { ...CFG, ...saved };
+    renderAll();
+    bindTabs();
+    bindChat();
+    bindCustom();
+    bindMe();
+    bindSettings();
+    renderChatHistory();
+    renderStorage();
+}
+
+/* ========== 渲染 ========== */
+function renderAll() {
+    document.getElementById('topTitle').textContent = CFG.partnerName;
+    document.getElementById('meName').textContent = CFG.myName;
+    document.getElementById('meAvatar').innerHTML = CFG.myAvatar ? `<img src="${CFG.myAvatar}">` : CFG.myName.charAt(0);
+    renderCustomList();
+}
+
+/* ========== 聊天 ========== */
+function bindChat() {
+    document.getElementById('sendBtn').addEventListener('click', sendMessage);
+    document.getElementById('msgInput').addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); sendMessage(); }
+    });
+}
+
+function sendMessage() {
+    const input = document.getElementById('msgInput');
+    const text = input.value.trim();
+    if (!text) return;
+
+    addMessage(text, true);
+    CFG.chatHistory.push({ sender: 'me', text, time: Date.now() });
+    dbPut(CFG, 'main');
+    input.value = '';
+    scheduleReply();
+}
+
+function scheduleReply() {
+    if (replyTimer) clearTimeout(replyTimer);
+    const min = CFG.delayMin * 1000;
+    const max = CFG.delayMax * 1000;
+    const delay = min + Math.random() * Math.max(0, max - min);
+
+    if (CFG.useReadReceipt && lastMsgEl) {
+        setTimeout(() => {
+            if (lastMsgEl) { lastMsgEl.classList.add('read'); lastMsgEl.textContent = '已读'; }
+        }, 500);
+    }
+
+    replyTimer = setTimeout(() => {
+        if (CFG.useTyping) showTyping();
+        setTimeout(() => {
+            removeTyping();
+            doReply();
+        }, 500 + Math.random() * 800);
+    }, delay);
+}
+
+function doReply() {
+    // 概率：直接发emoji
+    if (CFG.customEmojis.length > 0 && Math.random() * 100 < CFG.pPureEmoji) {
+        const emoji = CFG.customEmojis[Math.floor(Math.random() * CFG.customEmojis.length)];
+        addMessage('', false, { stickerOnly: true, stickerContent: emoji });
+        CFG.chatHistory.push({ sender: 'them', text: '[emoji]', time: Date.now() });
+        dbPut(CFG, 'main');
+        return;
+    }
+
+    // 决定发几条
+    const r = Math.random() * 100;
+    let count = 1;
+    if (r < CFG.p1) count = 1;
+    else if (r < CFG.p1 + CFG.p2) count = 2;
+    else count = 3;
+
+    if (CFG.customReplies.length === 0) {
+        addMessage('（还没有字卡）', false);
+        return;
+    }
+
+    let sent = 0;
+    const sendNext = () => {
+        if (sent >= count) return;
+        let text = CFG.customReplies[Math.floor(Math.random() * CFG.customReplies.length)];
+
+        // 引用
+        let quoteText = '', quoteName = '';
+        if (CFG.useQuote && Math.random() < 0.3) {
+            const myMsgs = CFG.chatHistory.filter(m => m.sender === 'me');
+            if (myMsgs.length > 0) {
+                const sel = myMsgs[Math.floor(Math.random() * myMsgs.length)];
+                quoteText = sel.text; quoteName = CFG.myName;
+            }
+        }
+
+        // 附带emoji
+        let emoji = null;
+        if (CFG.customEmojis.length > 0 && Math.random() * 100 < CFG.pEmoji) {
+            emoji = CFG.customEmojis[Math.floor(Math.random() * CFG.customEmojis.length)];
+        }
+        if (emoji) {
+            text = Math.random() < 0.5 ? emoji + ' ' + text : text + ' ' + emoji;
+        }
+
+        addMessage(text, false, { quoteText, quoteName });
+        CFG.chatHistory.push({ sender: 'them', text, time: Date.now() });
+        dbPut(CFG, 'main');
+        sent++;
+        if (sent < count) setTimeout(sendNext, 600 + Math.random() * 500);
+    };
+    sendNext();
+}
+
+function addMessage(text, isMe, opts = {}) {
+    const { stickerOnly = false, stickerContent = '', quoteText = '', quoteName = '' } = opts;
+    const chatArea = document.getElementById('chatArea');
+    const row = document.createElement('div');
+    row.className = 'msg-row ' + (isMe ? 'me' : 'them');
+
+    const av = document.createElement('div');
+    av.className = 'msg-avatar';
+    const avUrl = isMe ? CFG.myAvatar : CFG.partnerAvatar;
+    const avText = isMe ? CFG.myName : CFG.partnerName;
+    if (avUrl) av.innerHTML = `<img src="${avUrl}">`;
+    else av.textContent = (avText || '?').charAt(0);
+
+    const bubble = document.createElement('div');
+    bubble.className = 'msg-bubble';
+    if (quoteText) {
+        const q = document.createElement('div');
+        q.className = 'quote-block';
+        q.innerHTML = `<span class="qn">${quoteName}：</span>${escapeHtml(quoteText)}`;
+        bubble.appendChild(q);
+    }
+    if (stickerOnly) {
+        bubble.classList.add('sticker-only');
+        const sp = document.createElement('span');
+        sp.className = 'emoji-big';
+        sp.textContent = stickerContent;
+        bubble.appendChild(sp);
+    } else {
+        bubble.appendChild(document.createTextNode(text));
+    }
+
+    row.appendChild(av); row.appendChild(bubble);
+    chatArea.appendChild(row);
+    chatArea.scrollTop = chatArea.scrollHeight;
+
+    if (isMe && CFG.useReadReceipt) {
+        const r = document.createElement('div');
+        r.className = 'read-receipt';
+        r.textContent = '未读';
+        row.appendChild(r);
+        lastMsgEl = r;
+    }
+}
+
+function renderChatHistory() {
+    const chatArea = document.getElementById('chatArea');
+    chatArea.innerHTML = '';
+    CFG.chatHistory.forEach(m => addMessage(m.text, m.sender === 'me', {}, false));
+    chatArea.scrollTop = chatArea.scrollHeight;
+}
+
+function showTyping() {
+    removeTyping();
+    const chatArea = document.getElementById('chatArea');
+    const row = document.createElement('div');
+    row.className = 'msg-row them'; row.id = 'typingRow';
+    const av = document.createElement('div'); av.className = 'msg-avatar';
+    if (CFG.partnerAvatar) av.innerHTML = `<img src="${CFG.partnerAvatar}">`;
+    else av.textContent = (CFG.partnerName || '对').charAt(0);
+    const dots = document.createElement('div');
+    dots.className = 'typing-dots';
+    dots.innerHTML = '<span></span><span></span><span></span>';
+    row.appendChild(av); row.appendChild(dots);
+    chatArea.appendChild(row);
+    chatArea.scrollTop = chatArea.scrollHeight;
+}
+function removeTyping() {
+    const el = document.getElementById('typingRow');
+    if (el) el.remove();
+}
+
+function escapeHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/* ========== 自定义页 ========== */
+function bindCustom() {
+    document.querySelectorAll('.custom-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            currentTab = tab.dataset.tab;
+            document.querySelectorAll('.custom-tab').forEach(t => t.classList.toggle('active', t === tab));
+            renderCustomList();
+        });
+    });
+    document.getElementById('addBtn').addEventListener('click', () => openEditModal(-1));
+    document.getElementById('exportBtn').addEventListener('click', exportData);
+    document.getElementById('importBtn').addEventListener('click', importData);
+    document.getElementById('searchBtn').addEventListener('click', openSearchModal);
+    document.getElementById('groupBtn').addEventListener('click', () => alert('分组功能第二批做'));
+}
+
+function renderCustomList() {
+    const list = document.getElementById('customList');
+    const tags = document.getElementById('customTags');
+    const arr = currentTab === 'replies' ? CFG.customReplies : CFG.customEmojis;
+    const label = currentTab === 'replies' ? '字卡' : 'Emoji';
+
+    tags.innerHTML = `
+        <div class="tag active">全部 ${arr.length}</div>
+        <div class="tag">未分组 ${arr.length}</div>
+    `;
+
+    list.innerHTML = '';
+    if (arr.length === 0) {
+        list.innerHTML = `<div class="empty-tip">还没有${label}，点下面"+ 新增"或"导入"</div>`;
+        return;
+    }
+    arr.forEach((text, idx) => {
+        const item = document.createElement('div');
+        item.className = 'card-item';
+        item.innerHTML = `
+            <div class="text">${escapeHtml(text)}</div>
+            <div class="actions">
+                <i class="fas fa-thumbtack pin" data-idx="${idx}"></i>
+                <i class="fas fa-tag tag-icon" data-idx="${idx}"></i>
+                <i class="fas fa-pen edit" data-idx="${idx}"></i>
+                <i class="fas fa-trash del" data-idx="${idx}"></i>
+            </div>
+        `;
+        item.querySelector('.edit').addEventListener('click', () => openEditModal(idx));
+        item.querySelector('.del').addEventListener('click', () => deleteItem(idx));
+        item.querySelector('.pin').addEventListener('click', () => alert('置顶功能第二批做'));
+        item.querySelector('.tag-icon').addEventListener('click', () => alert('标签功能第二批做'));
+        list.appendChild(item);
+    });
+}
+
+function openEditModal(idx) {
+    const arr = currentTab === 'replies' ? CFG.customReplies : CFG.customEmojis;
+    const oldText = idx === -1 ? '' : arr[idx];
+    showInputModal(idx === -1 ? '新增' : '编辑', oldText, async (newText) => {
+        if (!newText.trim()) return;
+        if (idx === -1) arr.push(newText.trim());
+        else arr[idx] = newText.trim();
+        await dbPut(CFG, 'main');
+        renderCustomList();
+        renderStorage();
+    });
+}
+
+function showInputModal(title, defaultValue, onSave) {
+    const mask = document.createElement('div');
+    mask.className = 'modal-mask';
+    mask.innerHTML = `
+        <div class="modal-box">
+            <div class="modal-title">${title}</div>
+            <div class="modal-body"><textarea id="modalInput">${escapeHtml(defaultValue || '')}</textarea></div>
+            <div class="modal-btns">
+                <button id="modalCancel">取消</button>
+                <button id="modalSave">保存</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(mask);
+    mask.querySelector('#modalCancel').addEventListener('click', () => mask.remove());
+    mask.querySelector('#modalSave').addEventListener('click', async () => {
+        await onSave(mask.querySelector('#modalInput').value);
+        mask.remove();
+    });
+}
+
+function deleteItem(idx) {
+    if (!confirm('确定删除？')) return;
+    const arr = currentTab === 'replies' ? CFG.customReplies : CFG.customEmojis;
+    arr.splice(idx, 1);
+    dbPut(CFG, 'main').then(() => { renderCustomList(); renderStorage(); });
+}
+
+function openSearchModal() {
+    const keyword = prompt('搜索：');
+    if (!keyword) { renderCustomList(); return; }
+    const arr = currentTab === 'replies' ? CFG.customReplies : CFG.customEmojis;
+    const filtered = arr.filter(t => t.includes(keyword));
+    const list = document.getElementById('customList');
+    list.innerHTML = '';
+    if (filtered.length === 0) {
+        list.innerHTML = `<div class="empty-tip">没找到</div>`;
+        return;
+    }
+    filtered.forEach(text => {
+        const item = document.createElement('div');
+        item.className = 'card-item';
+        item.innerHTML = `<div class="text">${escapeHtml(text)}</div>`;
+        list.appendChild(item);
+    });
+}
+
+/* ========== 导入导出（字卡emoji） ========== */
+function exportData() {
+    const data = {
+        customReplies: CFG.customReplies,
+        customEmojis: CFG.customEmojis,
+        customPokes: CFG.customPokes,
+        exportDate: new Date().toISOString()
+    };
+    downloadJSON(data, '字卡emoji_' + dateStr() + '.json');
+}
+
+function importData() {
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.json,application/json';
+    fileInput.addEventListener('change', async e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        try {
+            const data = JSON.parse(await file.text());
+            const replies = data.customReplies || [];
+            const emojis = data.customEmojis || [];
+            const pokes = data.customPokes || [];
+            showImportChoice(replies, emojis, pokes);
+        } catch(err) { alert('解析失败：' + err.message); }
+    });
+    fileInput.click();
+}
+
+function showImportChoice(replies, emojis, pokes) {
+    const mask = document.createElement('div');
+    mask.className = 'modal-mask';
+    mask.innerHTML = `
+        <div class="modal-box">
+            <div class="modal-title">导入方式</div>
+            <div class="modal-body" style="text-align:center; font-size:14px; color:#666; line-height:1.8;">
+                字卡 ${replies.length} 条 · Emoji ${emojis.length} 条 · 拍一拍 ${pokes.length} 条
+            </div>
+            <div class="modal-btns vertical">
+                <button id="cover" style="color:#ff3b30;">覆盖（清空旧的）</button>
+                <button id="append">追加（保留旧的）</button>
+                <button id="cancel" style="color:#666;">取消</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(mask);
+    mask.querySelector('#cover').addEventListener('click', async () => {
+        CFG.customReplies = replies.slice();
+        CFG.customEmojis = emojis.slice();
+        CFG.customPokes = pokes.slice();
+        await dbPut(CFG, 'main');
+        renderCustomList(); renderStorage(); mask.remove();
+    });
+    mask.querySelector('#append').addEventListener('click', async () => {
+        CFG.customReplies = CFG.customReplies.concat(replies);
+        CFG.customEmojis = CFG.customEmojis.concat(emojis);
+        CFG.customPokes = CFG.customPokes.concat(pokes);
+        await dbPut(CFG, 'main');
+        renderCustomList(); renderStorage(); mask.remove();
+    });
+    mask.querySelector('#cancel').addEventListener('click', () => mask.remove());
+}
+
+/* ========== 我页 ========== */
+function bindMe() {
+    document.getElementById('editMyName').addEventListener('click', () => {
+        showInputModal('我的昵称', CFG.myName, async v => {
+            if (!v.trim()) return;
+            CFG.myName = v.trim();
+            await dbPut(CFG, 'main');
+            renderAll();
+        });
+    });
+    document.getElementById('editMyAvatar').addEventListener('click', () => {
+        pickImage(async dataUrl => {
+            CFG.myAvatar = dataUrl;
+            await dbPut(CFG, 'main');
+            renderAll();
+        });
+    });
+    document.getElementById('editPartnerName').addEventListener('click', () => {
+        showInputModal('对方昵称', CFG.partnerName, async v => {
+            if (!v.trim()) return;
+            CFG.partnerName = v.trim();
+            await dbPut(CFG, 'main');
+            renderAll();
+        });
+    });
+    document.getElementById('editPartnerAvatar').addEventListener('click', () => {
+        pickImage(async dataUrl => {
+            CFG.partnerAvatar = dataUrl;
+            await dbPut(CFG, 'main');
+            renderAll();
+        });
+    });
+    document.getElementById('toSettings').addEventListener('click', () => {
+        showPage('settings');
+        document.getElementById('backBtn').classList.add('show');
+    });
+}
+
+function pickImage(callback) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.addEventListener('change', e => {
+        const f = e.target.files[0];
+        if (!f) return;
+        const r = new FileReader();
+        r.onload = e => callback(e.target.result);
+        r.readAsDataURL(f);
+    });
+    input.click();
+}
+
+/* ========== 设置页 ========== */
+function bindSettings() {
+    bindSlider('delayMin', 'delayMinVal', v => { CFG.delayMin = v; }, v => v + 's');
+    bindSlider('delayMax', 'delayMaxVal', v => { CFG.delayMax = v; }, v => v + 's');
+    bindSlider('p1', 'p1v', v => { CFG.p1 = v; }, v => v + '%');
+    bindSlider('p2', 'p2v', v => { CFG.p2 = v; }, v => v + '%');
+    bindSlider('p3', 'p3v', v => { CFG.p3 = v; }, v => v + '%');
+    bindSlider('pEmoji', 'pEmojiv', v => { CFG.pEmoji = v; }, v => v + '%');
+    bindSlider('pPureEmoji', 'pPureEmojiv', v => { CFG.pPureEmoji = v; }, v => v + '%');
+    bindSwitch('useQuote', v => CFG.useQuote = v);
+    bindSwitch('useTyping', v => CFG.useTyping = v);
+    bindSwitch('useReadReceipt', v => CFG.useReadReceipt = v);
+
+    document.getElementById('exportChat').addEventListener('click', () => {
+        downloadJSON({ chatHistory: CFG.chatHistory, exportDate: new Date().toISOString() }, '聊天记录_' + dateStr() + '.json');
+    });
+    document.getElementById('importChat').addEventListener('click', () => {
+        pickJSON(async data => {
+            if (!data.chatHistory) { alert('格式不对'); return; }
+            CFG.chatHistory = data.chatHistory;
+            await dbPut(CFG, 'main');
+            renderChatHistory();
+            alert('聊天记录已导入');
+        });
+    });
+    document.getElementById('exportAll').addEventListener('click', () => {
+        downloadJSON(CFG, '全部数据_' + dateStr() + '.json');
+    });
+    document.getElementById('importAll').addEventListener('click', () => {
+        pickJSON(async data => {
+            if (!confirm('恢复全部数据会覆盖当前所有内容，继续？')) return;
+            CFG = { ...DEFAULT, ...data };
+            await dbPut(CFG, 'main');
+            renderAll(); renderChatHistory(); renderStorage();
+            alert('已恢复');
+        });
+    });
+    document.getElementById('clearChat').addEventListener('click', async () => {
+        if (!confirm('确定删除所有聊天消息？')) return;
+        CFG.chatHistory = [];
+        await dbPut(CFG, 'main');
+        renderChatHistory();
+        renderStorage();
+    });
+}
+
+function bindSlider(id, vid, setter, formatter) {
+    const el = document.getElementById(id), vEl = document.getElementById(vid);
+    el.addEventListener('input', async e => {
+        const v = parseInt(e.target.value);
+        vEl.textContent = formatter(v);
+        setter(v);
+        await dbPut(CFG, 'main');
+    });
+}
+function bindSwitch(id, setter) {
+    document.getElementById(id).addEventListener('change', async e => {
+        setter(e.target.checked);
+        await dbPut(CFG, 'main');
+    });
+}
+
+/* ========== 工具 ========== */
+function downloadJSON(data, filename) {
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+function pickJSON(callback) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,application/json';
+    input.addEventListener('change', async e => {
+        const f = e.target.files[0];
+        if (!f) return;
+        try { callback(JSON.parse(await f.text())); }
+        catch(err) { alert('解析失败：' + err.message); }
+    });
+    input.click();
+}
+function dateStr() {
+    const d = new Date();
+    return d.getFullYear() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0');
+}
+function formatBytes(b) {
+    if (b < 1024) return b + ' B';
+    if (b < 1024*1024) return (b/1024).toFixed(1) + ' KB';
+    return (b/1024/1024).toFixed(2) + ' MB';
+}
+async function renderStorage() {
+    try {
+        const str = JSON.stringify(CFG);
+        const bytes = new Blob([str]).size;
+        const total = 500 * 1024 * 1024;
+        document.getElementById('storageFill').style.width = Math.min(100, (bytes/total)*100) + '%';
+        document.getElementById('storageText').textContent = formatBytes(bytes) + ' / 500 MB';
+    } catch(e) {}
+}
+
+/* ========== 页面切换 ========== */
+function showPage(name) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page-' + name).classList.add('active');
+    if (name === 'chat') {
+        document.getElementById('topTitle').textContent = CFG.partnerName;
+        document.getElementById('backBtn').classList.remove('show');
+    } else if (name === 'custom') {
+        document.getElementById('topTitle').textContent = '自定义';
+        document.getElementById('backBtn').classList.remove('show');
+    } else if (name === 'me') {
+        document.getElementById('topTitle').textContent = '我';
+        document.getElementById('backBtn').classList.remove('show');
+    } else if (name === 'settings') {
+        document.getElementById('topTitle').textContent = '设置';
+        document.getElementById('backBtn').classList.add('show');
+    }
+}
+
+function bindTabs() {
+    document.querySelectorAll('.tab-item').forEach(tab => {
+        tab.addEventListener('click', () => {
+            const page = tab.dataset.page;
+            document.querySelectorAll('.tab-item').forEach(t => t.classList.toggle('active', t === tab));
+            showPage(page);
+        });
+    });
+    document.getElementById('backBtn').addEventListener('click', () => {
+        showPage('me');
+        document.querySelectorAll('.tab-item').forEach(t => t.classList.toggle('active', t.dataset.page === 'me'));
+    });
+}
+
+init();
+</script>
+</body>
+          </html>
